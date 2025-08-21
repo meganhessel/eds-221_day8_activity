@@ -1,0 +1,151 @@
+---
+title: "ggplot_activity"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+# Task 1 : making the worst graph
+
+```{r}
+library(here)
+library(tidyverse)
+library(ggplot2)
+library(janitor)
+library(dplyr)
+library(paletteer)
+library(patchwork)
+```
+
+```{r}
+space <- read_csv(here("data", "space_launches.csv"))
+
+worst <- ggplot(data = space, 
+       aes(y = type)) + 
+  geom_bar(color = "yellow", 
+           alpha = 0.7, 
+           size = 0.4) + 
+  scale_x_continuous(breaks = seq(0, 700, by = 50), 
+                     limits = c(0,650)) +
+  theme_dark() +
+  theme(panel.background = element_rect(fill = 'green', colour = 'red')) + 
+  labs(title = "Number of Types", 
+       y = "Type of Missions") +
+  theme(axis.text.y = element_text(size = 4))
+
+ggsave(here("figs", "worst_graph.jpg"))
+```
+
+
+# Task 2: Wrangling practice 
+
+```{r}
+ghg <- read_csv(here("data", "San_Francisco_Communitywide_Greenhouse_Gas_Inventory.csv"))
+
+# clean the data 
+ghg <- ghg %>% 
+  clean_names()
+
+# summary tables
+sector_sum <- ghg %>% 
+  group_by(sector_general) %>% 
+  summarise(emissions_mt_co2e)
+
+
+yr_com_sum <- ghg %>% 
+  group_by(calendar_year, commodity_type) %>% 
+  summarise(emissions_mt_co2e)
+
+# subset only containing 2005 and PG&E 
+sub_ghg <- ghg %>% 
+  filter(calendar_year == "2005") %>% 
+  filter(str_detect(sector_detail2, pattern = "PG&E")) %>% 
+  select(calendar_year, sector_detail2, emissions_mt_co2e)
+
+```
+
+# Task 3: best graph 
+```{r}
+#looking and working with data 
+com_mean <- ghg %>% 
+  group_by(commodity_type) %>% 
+  summarise(mean(emissions_mt_co2e, na.rm = TRUE))
+
+sec_mean <- ghg %>% 
+  group_by(sector_general) %>% 
+  summarise(mean(emissions_mt_co2e, na.rm = TRUE)) %>% 
+  rename(emissions_co2e_mean = `mean(emissions_mt_co2e, na.rm = TRUE)`)
+
+
+ghg <- ghg %>% 
+  mutate(date = lubridate::as_date(calendar_year))
+
+sec_yr_mean <- ghg %>% 
+  group_by(sector_general, calendar_year) %>% 
+  summarise(mean(emissions_mt_co2e, na.rm =TRUE)) %>% 
+  rename(emissions_co2e_mean = `mean(emissions_mt_co2e, na.rm = TRUE)`) 
+
+
+library(fmsb)
+
+
+
+
+# confusing graph
+confusing_graph <- ggplot(data = ghg, 
+       aes(x = emissions_mt_co2e, 
+           y = sector_general)) + 
+  geom_jitter(color = "coral", 
+              alpha = 0.3) + 
+  theme_light() + 
+  theme(plot.title = element_text(hjust = 1)) +
+  labs(x = "CO2 Emissions", 
+       y = "Commodity Type", 
+       title = "Emissions of various sectors and commodity types", 
+       color = "General Sectors")
+confusing_graph
+
+# cool graph
+cool_graph <- ggplot(data = sec_mean, 
+       aes(x = sector_general, 
+           y = emissions_co2e_mean)) + 
+  geom_col(fill = "coral", 
+              alpha = 0.7) + 
+  theme_light() + 
+  theme(plot.title = element_text(hjust = .5)) +
+  labs(x = "General Sectors", 
+       y = "Mean CO2 Emissions", 
+       title = "Mean sectors' emissions from 1990 to 2020")
+cool_graph
+
+#fail
+ggplot(data = sec_yr_mean, 
+       aes(x = calendar_year, 
+           y = emissions_co2e_mean)) + 
+geom_line()
+
+
+# best graph: CO2 emissions between sectors overtime
+  
+best_graph <- ggplot(sec_yr_mean, 
+       aes(x = calendar_year, 
+           y = emissions_co2e_mean, 
+           color = sector_general)) +
+geom_line(show.legend = FALSE) + 
+  facet_wrap(~sector_general) +
+  theme(panel.spacing.x = unit(0.8, "cm")) +
+  labs(title = "CO2 emissions between sectors overtime", 
+       x = "years",
+       y = "CO2 emissions")
+best_graph
+
+#combined graphs to make AWESOME graph
+awesome_graph <- (best_graph / cool_graph)
+awesome_graph
+
+ggsave(here("figs", "cool_graph.jpg"))
+ggsave(here("figs", "best_graph.jpg"))
+ggsave(here("figs", "awesome_graph.jpg"), height = 7)
+```
+
